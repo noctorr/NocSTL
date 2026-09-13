@@ -61,16 +61,16 @@ namespace stl {
       #define CPP_CONSTEXPR
 #endif
 
-#define CPU_COMPILER_INSTRICS [[gnu::target("avx2"), gnu::always_inline, gnu::arch("native"), gnu::optimize("O3"), gnu::min_vector_size(128)]]
+#define CPU_COMPILER_INSTRICS [[gnu::always_inline, gnu::optimize("O3")]]
 
-CPU_COMPILER_INSTRICS CPP_CONSTEXPR FMD64 add_fmd64(
+CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static FMD64 add_fmd64(
     FMD64 vector1,
     FMD64 vector2
 ) {
     return vector1 + vector2;
 }
 
-CPU_COMPILER_INSTRICS CPP_CONSTEXPR void padd_fmd64(
+CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static void padd_fmd64(
     FMD64 __restrict* result,
     FMD64 __restrict* from
 ) {
