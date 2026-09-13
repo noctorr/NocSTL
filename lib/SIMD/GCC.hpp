@@ -71,11 +71,10 @@ CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static FMD64 add_fmd64(
 }
 
 CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static void padd_fmd64(
-    FMD64 __restrict* result,
-    FMD64 __restrict* from
+    FMD64& result,
+    FMD64 const& from
 ) {
-    *result += *from;
-    *(result + 1) += *(from + 1);
+    result += from;
 }
 
 	#endif
