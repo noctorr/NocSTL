@@ -1,0 +1,137 @@
+#include <memory>
+#include <memory_resource>
+#include <mutex>
+#include <cstddef>
+#include <initializer_list>
+#include <span>
+
+namespace stl {
+    template < typename _Type, typename Alloc = std::pmr::polymorphic_allocator<_Type>>
+    class vector final {
+        mutable std::mutex m_lock;
+        _Type* m_data        { nullptr };
+        std::size_t m_size   { 0 };
+        std::size_t m_cap    { 0 };
+        public:
+        vector() : m_cap(5)
+        {
+            m_data = allocTraits::allocate(
+                m_attr, m_cap
+            );
+        }
+
+        vector(
+            std::initializer_list<_Type> _list
+        ) : m_size(_list.size()), m_cap(_list.size() * 2)
+        {
+            m_data = allocTraits::allocate(
+                m_attr, m_cap
+            );
+
+            std::size_t index{};
+            for (
+                typename std::initializer_list<_Type>::iterator It = _list.begin();
+                It != _list.end();
+                It++, index++
+            ) {
+                allocTraits::construct(m_attr, m_data + index, *It);
+            }
+        }
+
+        vector(
+            std::span<_Type> _list
+        ) : m_size(_list.size()), m_cap(_list.size() * 2)
+        {
+            m_data = allocTraits::allocate(
+                m_attr, m_cap
+            );
+
+            std::size_t index{};
+            for (
+                typename std::span<_Type>::iterator It = _list.begin();
+                It != _list.end();
+                It++, index++
+            ) {
+                allocTraits::construct(m_attr, m_data + index, *It);
+            }
+        }
+
+        vector(
+            const vector& other
+        ) : m_data(other.m_data), m_cap(other.m_cap), m_size(other.m_size)
+        {}
+
+        vector(
+            vector&& other
+        ) : m_data(other.m_data), m_cap(other.m_cap), m_size(other.m_size)
+        {
+            other.m_data = nullptr;
+            other.m_cap = 0;
+            other.m_size = 0;
+        }
+
+        ~vector() {
+            clear();
+            allocTraits::deallocate(m_attr, m_data, m_cap);
+        }
+
+        vector& operator= ( const vector& other ) noexcept
+        {
+            std::lock_guard<std::mutex> _cpy(m_lock);
+
+            if ( this != &other ) {
+                m_data = other.m_data;
+                m_cap = other.m_cap;
+                m_size = other.m_size;
+            }
+
+            return *this;
+        }
+
+        vector& operator= ( vector&& other ) noexcept
+        {
+            std::lock_guard<std::mutex> _mov(m_lock);
+
+            if ( this != &other ) {
+                m_data = other.m_data;
+                m_cap = other.m_cap;
+                m_size = other.m_size;
+
+                other.m_data = nullptr;
+                other.m_cap = 0;
+                other.m_size = 0;
+            }
+
+            return *this;
+        }
+
+        _Type& operator[] ( const std::size_t index ) const
+        {
+            std::lock_guard<std::mutex> _dang_check(m_lock);
+
+            return m_data[index];
+        }
+
+        void clear() noexcept {
+            std::lock_guard<std::mutex> _clr(m_lock);
+            if (
+                m_size != 0
+            ) {
+                for (
+                    std::size_t idx{};
+                    idx < m_size;
+                    idx++
+                ) {
+                    allocTraits::destroy(
+                        m_attr,
+                        m_data + idx
+                    );
+                }
+                m_size = 0;
+            }
+        }
+        private:
+        using allocTraits = std::allocator_traits<Alloc>;
+        Alloc m_attr;
+    };
+}
