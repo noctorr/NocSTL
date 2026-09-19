@@ -22,6 +22,9 @@ namespace stl {
         std::size_t m_size   { 0 };
         std::size_t m_cap    { 0 };
         public:
+        using type = _Type;
+        using allocator_type = Alloc;
+        using pointer_type = _Type*;
 
         static_assert(
             std::is_same_v<
@@ -36,6 +39,19 @@ namespace stl {
             m_data = allocTraits::allocate(
                 m_attr, m_cap
             );
+        }
+
+        vector(
+            std::size_t _cap
+        ) : m_cap(_cap)
+        {
+            if (
+                _cap != 0
+            ) {
+                m_data = allocTraits::allocate(
+                    m_attr, m_cap
+                );
+            }
         }
 
         vector(
@@ -158,7 +174,7 @@ namespace stl {
         }
 
         template < typename... _Params >
-        void emplace_back(_Params&&... _input)
+        void emplace_back(_Params&... _input)
         {
             std::lock_guard<std::mutex> _emp_back(m_lock);
             if ( m_size == m_cap ) {
@@ -179,6 +195,24 @@ namespace stl {
                     _Type{std::forward<_Params>(_input)...}
                 );
             }
+        }
+
+        void resize ( const std::size_t _new_cap )
+        {
+            std::lock_guard<std::mutex> _resize(m_lock);
+
+            if ( _new_cap == m_cap ) {
+                return;
+            } else {
+                realloc_cap(_new_cap);
+            }
+        }
+
+        void reserve ( const std::size_t _requested_space )
+        {
+            std::lock_guard<std::mutex> _res(m_lock);
+
+            realloc_cap(m_cap + _requested_space);
         }
 
         void clear() noexcept {
@@ -223,30 +257,61 @@ namespace stl {
                 m_size != 0 &&
                 m_cap != 0
             ) {
-                _Type* _buffer = allocTraits::allocate(m_attr, m_cap);
-                for (
-                    std::size_t index{};
-                    index < m_cap;
-                    index++
-                ) {
-                    allocTraits::construct(m_attr, _buffer + index, *(m_data + index));
-                    allocTraits::destroy(m_attr, m_data + index);
-                }
+                if ( _new_cap > m_cap ) {
+                    _Type* _buffer = allocTraits::allocate(m_attr, m_cap);
+                    for (
+                        std::size_t index{};
+                        index < m_cap;
+                        index++
+                    ) {
+                        allocTraits::construct(m_attr, _buffer + index, *(m_data + index));
+                        allocTraits::destroy(m_attr, m_data + index);
+                    }
 
-                allocTraits::deallocate(m_attr, m_data, m_cap);
-                m_data = allocTraits::allocate(m_attr, _new_cap);
+                    allocTraits::deallocate(m_attr, m_data, m_cap);
+                    m_data = allocTraits::allocate(m_attr, _new_cap);
                 
-                for (
-                    std::size_t index{};
-                    index < m_cap;
-                    index++
-                ) {
-                    allocTraits::construct(m_attr, m_data + index, *(_buffer + index));
-                    allocTraits::destroy(m_attr, _buffer + index);
-                }
+                    for (
+                        std::size_t index{};
+                        index < m_cap;
+                        index++
+                    ) {
+                        allocTraits::construct(m_attr, m_data + index, *(_buffer + index));
+                        allocTraits::destroy(m_attr, _buffer + index);
+                    }
 
-                allocTraits::deallocate(m_attr, _buffer, m_cap);
-                m_cap = _new_cap;
+                    allocTraits::deallocate(m_attr, _buffer, m_cap);
+                    m_cap = _new_cap;
+                } else {
+                    _Type* _buffer = allocTraits::allocate(m_attr, _new_cap);
+                    for (
+                        std::size_t index{};
+                        index < m_cap;
+                        index++
+                    ) {
+                        if ( index < _new_cap ) {
+                            allocTraits::construct(m_attr, _buffer + index, *(m_data + index));
+                            allocTraits::destroy(m_attr, m_data + index);
+                        } else {
+                            allocTraits::destroy(m_attr, m_data + index);
+                        }
+                    }
+
+                    allocTraits::deallocate(m_attr, m_data, m_cap);
+                    m_data = allocTraits::allocate(m_attr, _new_cap);
+
+                    for (
+                        std::size_t index{};
+                        index < _new_cap;
+                        index++
+                    ) {
+                        allocTraits::construct(m_attr, m_data + index, *(_buffer + index));
+                        allocTraits::destroy(m_attr, _buffer + index);
+                    }
+
+                    allocTraits::deallocate(m_attr, _buffer, _new_cap);
+                    m_cap = _new_cap;
+                }
             }
         }
 
