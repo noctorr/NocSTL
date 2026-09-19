@@ -112,6 +112,19 @@ namespace stl {
             return m_data[index];
         }
 
+        _Type& at ( const std::size_t index ) const
+        {
+            std::lock_guard<std::mutex> _throw_check(m_lock);
+
+            if (
+                index >= m_size
+            ) {
+                throw std::out_of_range("Input index for vector is out of the array's range.");
+            } else {
+                return m_data[index];
+            }
+        }
+
         void clear() noexcept {
             std::lock_guard<std::mutex> _clr(m_lock);
             if (
