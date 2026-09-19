@@ -126,7 +126,19 @@ namespace stl {
             }
         }
 
-        
+        void push_back(_Type _payload) {
+            std::lock_guard<std::mutex> _psh_bck(m_lock);
+            if ( m_size == m_cap ) {
+                realloc_cap(
+                    m_cap * 2
+                );
+                m_size += 1;
+                allocTraits::construct(m_attr, m_data + m_size, _payload);
+            } else {
+                m_size += 1;
+                allocTraits::construct(m_attr, m_data + m_size, _payload);
+            }
+        }
 
         void clear() noexcept {
             std::lock_guard<std::mutex> _clr(m_lock);
@@ -134,13 +146,13 @@ namespace stl {
                 m_size != 0
             ) {
                 for (
-                    std::size_t idx{};
-                    idx < m_size;
-                    idx++
+                    std::size_t index{};
+                    index < m_size;
+                    index++
                 ) {
                     allocTraits::destroy(
                         m_attr,
-                        m_data + idx
+                        m_data + index
                     );
                 }
                 m_size = 0;
@@ -149,6 +161,53 @@ namespace stl {
         private:
         using allocTraits = std::allocator_traits<Alloc>;
         Alloc m_attr;
+
+        void realloc_cap(
+            const std::size_t _new_cap
+        ) {
+            if (
+                m_size == 0 &&
+                m_cap == 0
+            ) {
+                m_data = allocTraits::allocate(m_attr, _new_cap);
+                m_data = _new_cap;
+            } else if (
+                m_size == 0 &&
+                m_cap != 0
+            ) {
+                allocTraits::deallocate(m_attr, m_data, m_cap);
+                m_data = allocTraits::allocate(m_attr, _new_cap);
+                m_cap = _new_cap;
+            } else if (
+                m_size != 0 &&
+                m_cap != 0
+            ) {
+                _Type* _buffer = allocTraits::allocate(m_attr, m_cap);
+                for (
+                    std::size_t index{};
+                    index < m_cap;
+                    index++
+                ) {
+                    allocTraits::construct(m_attr, _buffer + index, *(m_data + index));
+                    allocTraits::destroy(m_attr, m_data + index);
+                }
+
+                allocTraits::deallocate(m_attr, m_data, m_cap);
+                m_data = allocTraits::allocate(m_attr, _new_cap);
+                
+                for (
+                    std::size_t index{};
+                    index < m_cap;
+                    index++
+                ) {
+                    allocTraits::construct(m_attr, m_data + index, *(_buffer + index));
+                    allocTraits::destroy(m_attr, _buffer + index);
+                }
+
+                allocTraits::deallocate(m_attr, _buffer, m_cap);
+                m_cap = _new_cap;
+            }
+        }
 
         void realloc_cap_only(
             const std::size_t _new_cap
