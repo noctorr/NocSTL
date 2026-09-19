@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <span>
+#include <stdexcept>
 
 namespace stl {
     template < typename _Type, typename Alloc = std::pmr::polymorphic_allocator<_Type>>
@@ -125,6 +126,8 @@ namespace stl {
             }
         }
 
+        
+
         void clear() noexcept {
             std::lock_guard<std::mutex> _clr(m_lock);
             if (
@@ -146,5 +149,55 @@ namespace stl {
         private:
         using allocTraits = std::allocator_traits<Alloc>;
         Alloc m_attr;
+
+        void realloc_cap_only(
+            const std::size_t _new_cap
+        ) {
+            if (
+                m_size == 0 &&
+                m_cap == 0
+            )  {
+                m_data = allocTraits::allocate(m_attr, _new_cap);
+                m_cap = _new_cap;
+            } else if (
+                m_size == 0 &&
+                m_cap != 0
+            ) {
+                allocTraits::deallocate(m_attr, m_data, m_cap);
+                m_data = allocTraits::allocate(m_attr, _new_cap);
+                m_cap = _new_cap;
+            } else if (
+                m_size != 0 && 
+                m_cap != 0
+            ) {
+                for (
+                    std::size_t index{};
+                    index < m_size;
+                    index++
+                ) {
+                    allocTraits::destroy(m_attr, m_data + index);
+                }
+
+                allocTraits::deallocate(m_attr, m_data, m_cap);
+                m_data = allocTraits::allocate(m_attr, _new_cap);
+                m_cap = _new_cap;
+            }
+        }
+
+        void realloc_data(
+            const std::size_t _new_cap,
+            std::span<_Type> _new_data
+        ) {
+            realloc_cap_only(_new_cap);
+
+            std::size_t index{};
+            for (
+                typename std::span<_Type>::iterator It = _new_data.begin();
+                It != _new_data.end();
+                It++, index++
+            ) {
+                allocTraits::construct(m_attr, m_data + index, *It);
+            }
+        }
     };
 }
