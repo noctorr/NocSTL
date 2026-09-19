@@ -51,7 +51,7 @@ typedef std::uint64_t I64MD128 [[gnu::aligned(8), gnu::vector_size(16)]];
 typedef std::uint64_t I64MD256 [[gnu::aligned(8), gnu::vector_size(32)]];
 #endif
 
-// @defgroup  Functions
+/// @defgroup  Functions
 namespace md {
 #ifdef __cpp_constexpr
 #define CPP_CONSTEXPR constexpr
@@ -69,6 +69,36 @@ add_fmd64(FMD64 vector1, FMD64 vector2) {
 CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static void
 padd_fmd64(FMD64 &result, FMD64 const &from) {
   result += from;
+}
+
+CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static FMD64
+sub_fmd64(FMD64 vector1, FMD64 vector2) {
+  return vector1 - vector2;
+}
+
+CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static void
+psub_fmd64(FMD64 &result, FMD64 const& from) {
+  result -= from;
+}
+
+CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static FMD64
+mul_fmd64(FMD64 vector1, FMD64 vector2) {
+  return vector1 * vector2;
+}
+
+CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static void
+pmul_fmd64(FMD64& result, FMD64 const& from) {
+  result *= from;
+}
+
+CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static FMD64
+div_fmd64(FMD64 vector1, FMD64 vector2) {
+  return vector1 / vector2;
+}
+
+CPU_COMPILER_INSTRICS CPP_CONSTEXPR inline static void
+pdiv_fmd64(FMD64& result, FMD64 const& from) {
+  result /= from;
 }
 
 
