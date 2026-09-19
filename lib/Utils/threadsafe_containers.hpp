@@ -1,10 +1,18 @@
 #include <memory>
 #include <memory_resource>
+#include <utility>
+
 #include <mutex>
+
 #include <cstddef>
+
 #include <initializer_list>
 #include <span>
+
 #include <stdexcept>
+
+#include <concepts>
+#include <type_traits>
 
 namespace stl {
     template < typename _Type, typename Alloc = std::pmr::polymorphic_allocator<_Type>>
@@ -14,6 +22,15 @@ namespace stl {
         std::size_t m_size   { 0 };
         std::size_t m_cap    { 0 };
         public:
+
+        static_assert(
+            std::is_same_v<
+            typename std::remove_cv_t<_Type>,
+            _Type
+            >,
+            "A type for the vector cannot have any cv-qualifiers."
+        );
+
         vector() : m_cap(5)
         {
             m_data = allocTraits::allocate(
@@ -137,6 +154,30 @@ namespace stl {
             } else {
                 m_size += 1;
                 allocTraits::construct(m_attr, m_data + m_size, _payload);
+            }
+        }
+
+        template < typename... _Params >
+        void emplace_back(_Params&&... _input)
+        {
+            std::lock_guard<std::mutex> _emp_back(m_lock);
+            if ( m_size == m_cap ) {
+                realloc_cap(
+                    m_cap * 2
+                );
+                m_size += 1;
+                allocTraits::construct(
+                    m_attr,
+                    m_data + m_size,
+                    _Type{std::forward<_Params>(_input)...}
+                );
+            } else {
+                m_size += 1;
+                allocTraits::construct(
+                    m_attr,
+                    m_data + m_size,
+                    _Type{std::forward<_Params>(_input)...}
+                );
             }
         }
 
