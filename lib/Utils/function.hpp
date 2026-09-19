@@ -1,12 +1,4 @@
-#include <memory>
-#include <utility>
-#include <type_traits>
-#include <cstddef>
 #include <functional>
-
-#if __cplusplus >= 202600L
-#include <meta>
-#endif
 
 namespace stl {
 
