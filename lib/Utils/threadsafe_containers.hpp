@@ -280,6 +280,14 @@ namespace stl {
             return m_cap;
         }
 
+        const _Type* pbegin() {
+            return m_data;
+        }
+
+        const _Type* pend() {
+            return m_data + (m_cap - 1);
+        }
+
         #ifdef NOC_DEBUG
         using allocator_traits = std::allocator_traits<Alloc>;
 
