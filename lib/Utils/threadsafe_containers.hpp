@@ -17,6 +17,8 @@
 
 #include <cstdio>
 
+#include <iterator>
+
 namespace stl {
     namespace __utl {
         template < typename _Ty >
@@ -34,10 +36,71 @@ namespace stl {
         _Type* m_data        { nullptr };
         std::size_t m_size   { 0 };
         std::size_t m_cap    { 0 };
+
+        using allocTraits = std::allocator_traits<Alloc>;
         public:
         using type = _Type;
         using allocator_type = Alloc;
         using pointer_type = _Type*;
+
+        using const_pointer = typename allocTraits::const_pointer;
+
+        using size_type = std::size_t;
+        using difference_type = std::ptrdiff_t;
+
+        template < typename container >
+        struct iterator_base {
+            iterator_base(
+                container* _ctn = nullptr,
+                size_type _i = 0
+            ) : m_container(_ctn), m_idx(_i)
+            {}
+
+            iterator_base& operator+= ( size_type _i ) {
+                m_idx += _i;
+                return *this;
+            }
+
+            iterator_base& operator-= ( size_type _i ) {
+                m_idx -= _i;
+                return *this;
+            }
+
+            iterator_base& operator++ () {
+                ++m_idx;
+                return *this;
+            }
+
+            iterator_base& operator++ (int) {
+                m_idx++;
+                return *this;
+            }
+
+            iterator_base& operator-- () {
+                --m_idx;
+                return *this;
+            }
+
+            iterator_base& operator-- (int) {
+                m_idx--;
+                return *this;
+            }
+
+            difference_type operator-(const iterator_base& other) {
+                return m_idx - other.m_idx;
+            }
+
+            bool operator< (const iterator_base& other) {
+                return m_idx < other.m_idx;
+            }
+
+            bool operator==(const iterator_base& other) {
+                return m_container == other.m_container && m_idx == other.m_idx;
+            }
+            protected:
+            container* m_container;
+            size_type m_idx;
+        };
 
         vector() : m_cap(5)
         {
@@ -67,6 +130,17 @@ namespace stl {
 
         vector(
             std::initializer_list<_Type> _list
+        ) noexcept(
+            noexcept(
+                vector(
+                    std::declval<
+                    std::initializer_list<_Type>
+                    >(),
+                    std::declval<
+                    Alloc
+                    >()
+                )
+            )
         ) : m_size(_list.size()), m_cap(_list.size() * 2)
         {
             #ifdef NOC_DEBUG
@@ -88,6 +162,13 @@ namespace stl {
 
         vector(
             std::span<_Type> _list
+        ) noexcept(
+            noexcept(
+                vector(
+                    std::declval<std::span<_Type>>(),
+                    std::declval<Alloc>()
+                )
+            )
         ) : m_size(_list.size()), m_cap(_list.size() * 2)
         {
             #ifdef NOC_DEBUG
@@ -109,6 +190,12 @@ namespace stl {
 
         vector(
             const vector& other
+        ) noexcept(
+            noexcept(
+                vector(
+                    std::declval<const vector&>()
+                )
+            )
         ) : m_data(other.m_data), m_cap(other.m_cap), m_size(other.m_size)
         { 
             #ifdef NOC_DEBUG
@@ -118,6 +205,12 @@ namespace stl {
 
         vector(
             vector&& other
+        ) noexcept(
+            noexcept(
+                vector(
+                    std::declval<vector&&>()
+                )
+            )
         ) : m_data(other.m_data), m_cap(other.m_cap), m_size(other.m_size)
         {
             #ifdef NOC_DEBUG
@@ -136,7 +229,9 @@ namespace stl {
             allocTraits::deallocate(m_attr, m_data, m_cap);
         }
 
-        vector& operator= ( const vector& other ) noexcept
+        vector& operator= ( const vector& other ) noexcept(
+            allocTraits::propagate_on_copy_assignment::value == std::is_nothrow_copy_assignable_v<Alloc>
+        )
         {
             std::lock_guard<std::mutex> _cpy(m_lock);
             #ifdef NOC_DEBUG
@@ -151,7 +246,9 @@ namespace stl {
             return *this;
         }
 
-        vector& operator= ( vector&& other ) noexcept
+        vector& operator= ( vector&& other ) noexcept(
+            allocTraits::propagate_on_move_assignment::value == std::is_nothrow_move_assignable_v<Alloc>
+        )
         {
             std::lock_guard<std::mutex> _mov(m_lock);
             #ifdef NOC_DEBUG
@@ -170,7 +267,7 @@ namespace stl {
             return *this;
         }
 
-        _Type& operator[] ( const std::size_t index ) const
+        _Type& operator[] ( const std::size_t index ) const noexcept
         {
             std::lock_guard<std::mutex> _dang_check(m_lock);
 
@@ -384,8 +481,17 @@ namespace stl {
         }
         #endif
         private:
-        using allocTraits = std::allocator_traits<Alloc>;
         [[no_unique_address]] Alloc m_attr;
+
+        vector(
+            std::initializer_list<_Type>,
+            Alloc
+        ) {}
+
+        vector(
+            std::span<_Type>,
+            Alloc
+        ) {}
 
         void realloc_cap(
             const std::size_t _new_cap
