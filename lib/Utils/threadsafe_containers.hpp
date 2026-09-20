@@ -23,9 +23,12 @@ namespace stl {
         _Ty copy (_Ty x) {
             return x;
         }
+
+        template < typename _Ty >
+        concept cv_qual = std::is_same_v<typename std::remove_cv_t<_Ty>, _Ty>;
     }
 
-    template < typename _Type, typename Alloc = std::allocator<_Type>>
+    template < __utl::cv_qual _Type, typename Alloc = std::allocator<_Type>>
     class vector final {
         mutable std::mutex m_lock;
         _Type* m_data        { nullptr };
@@ -35,14 +38,6 @@ namespace stl {
         using type = _Type;
         using allocator_type = Alloc;
         using pointer_type = _Type*;
-
-        static_assert(
-            std::is_same_v<
-            typename std::remove_cv_t<_Type>,
-            _Type
-            >,
-            "A type for the vector cannot have any cv-qualifiers."
-        );
 
         vector() : m_cap(5)
         {
