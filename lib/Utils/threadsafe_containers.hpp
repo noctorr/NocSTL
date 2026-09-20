@@ -8,14 +8,24 @@
 
 #include <initializer_list>
 #include <span>
+#include <string>
 
 #include <stdexcept>
 
 #include <concepts>
 #include <type_traits>
 
+#include <cstdio>
+
 namespace stl {
-    template < typename _Type, typename Alloc = std::pmr::polymorphic_allocator<_Type>>
+    namespace __utl {
+        template < typename _Ty >
+        _Ty copy (_Ty x) {
+            return x;
+        }
+    }
+
+    template < typename _Type, typename Alloc = std::allocator<_Type>>
     class vector final {
         mutable std::mutex m_lock;
         _Type* m_data        { nullptr };
@@ -161,20 +171,36 @@ namespace stl {
 
         void push_back(_Type _payload) {
             std::lock_guard<std::mutex> _psh_bck(m_lock);
+            #ifdef NOC_DEBUG
+            std::puts("Start of Push_Back: Vector");
+            #endif
             if ( m_size == m_cap ) {
+                #ifdef NOC_DEBUG
+                std::puts("REALLOC CAP: Vector");
+                #endif
                 realloc_cap(
                     m_cap * 2
                 );
                 m_size += 1;
                 allocTraits::construct(m_attr, m_data + m_size, _payload);
             } else {
+                #ifdef NOC_DEBUG
+                std::puts("NO REALLOC: Vector");
+                
+                if constexpr (
+                    std::is_arithmetic_v<_Type> ||
+                    std::is_pointer_v<_Type>
+                ) {
+                    std::puts(std::to_string(_payload).c_str());
+                }
+                #endif
                 m_size += 1;
-                allocTraits::construct(m_attr, m_data + m_size, _payload);
+                allocTraits::construct(m_attr, m_data + (m_size - 1), _payload);
             }
         }
 
         template < typename... _Params >
-        void emplace_back(_Params&... _input)
+        void emplace_back(_Params&&... _input)
         {
             std::lock_guard<std::mutex> _emp_back(m_lock);
             if ( m_size == m_cap ) {
@@ -185,14 +211,14 @@ namespace stl {
                 allocTraits::construct(
                     m_attr,
                     m_data + m_size,
-                    _Type{std::forward<_Params>(_input)...}
+                    _Type{_input...}
                 );
             } else {
                 m_size += 1;
                 allocTraits::construct(
                     m_attr,
-                    m_data + m_size,
-                    _Type{std::forward<_Params>(_input)...}
+                    m_data + (m_size - 1),
+                    _Type{_input...}
                 );
             }
         }
@@ -233,9 +259,37 @@ namespace stl {
                 m_size = 0;
             }
         }
+
+        void swap(
+            std::size_t elemIdx1,
+            std::size_t elemIdx2
+        ) {
+            std::lock_guard<std::mutex> _swp(m_lock);
+            _Type& elem1 = at(elemIdx1);
+            _Type& elem2 = at(elemIdx2);
+
+            elem1 = __utl::copy(elem2);
+            elem2 = __utl::copy(elem1);
+        }
+
+        std::size_t size() {
+            return m_size;
+        }
+
+        std::size_t capacity() {
+            return m_cap;
+        }
+
+        #ifdef NOC_DEBUG
+        using allocator_traits = std::allocator_traits<Alloc>;
+
+        std::size_t get_max_alloc_size() {
+            return allocTraits::max_size(m_attr);
+        }
+        #endif
         private:
         using allocTraits = std::allocator_traits<Alloc>;
-        Alloc m_attr;
+        [[no_unique_address]] Alloc m_attr;
 
         void realloc_cap(
             const std::size_t _new_cap
@@ -245,7 +299,7 @@ namespace stl {
                 m_cap == 0
             ) {
                 m_data = allocTraits::allocate(m_attr, _new_cap);
-                m_data = _new_cap;
+                m_cap = _new_cap;
             } else if (
                 m_size == 0 &&
                 m_cap != 0
