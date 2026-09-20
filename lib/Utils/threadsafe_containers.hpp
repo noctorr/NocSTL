@@ -46,6 +46,9 @@ namespace stl {
 
         vector() : m_cap(5)
         {
+            #ifdef NOC_DEBUG
+            std::puts("Default constructed vector.");
+            #endif
             m_data = allocTraits::allocate(
                 m_attr, m_cap
             );
@@ -55,6 +58,9 @@ namespace stl {
             std::size_t _cap
         ) : m_cap(_cap)
         {
+            #ifdef NOC_DEBUG
+            std::puts("Constructed Vector.");
+            #endif
             if (
                 _cap != 0
             ) {
@@ -68,6 +74,9 @@ namespace stl {
             std::initializer_list<_Type> _list
         ) : m_size(_list.size()), m_cap(_list.size() * 2)
         {
+            #ifdef NOC_DEBUG
+            std::puts("Initializer List constructed Vector.");
+            #endif
             m_data = allocTraits::allocate(
                 m_attr, m_cap
             );
@@ -86,6 +95,9 @@ namespace stl {
             std::span<_Type> _list
         ) : m_size(_list.size()), m_cap(_list.size() * 2)
         {
+            #ifdef NOC_DEBUG
+            std::puts("Span constructed Vector.");
+            #endif
             m_data = allocTraits::allocate(
                 m_attr, m_cap
             );
@@ -103,18 +115,28 @@ namespace stl {
         vector(
             const vector& other
         ) : m_data(other.m_data), m_cap(other.m_cap), m_size(other.m_size)
-        {}
+        { 
+            #ifdef NOC_DEBUG
+            std::puts("Copy constructed Vector.");
+            #endif
+        }
 
         vector(
             vector&& other
         ) : m_data(other.m_data), m_cap(other.m_cap), m_size(other.m_size)
         {
+            #ifdef NOC_DEBUG
+            std::puts("Move constructed Vector.");
+            #endif
             other.m_data = nullptr;
             other.m_cap = 0;
             other.m_size = 0;
         }
 
         ~vector() {
+            #ifdef NOC_DEBUG
+            std::puts("Destructor of Vector.");
+            #endif
             clear();
             allocTraits::deallocate(m_attr, m_data, m_cap);
         }
@@ -122,7 +144,9 @@ namespace stl {
         vector& operator= ( const vector& other ) noexcept
         {
             std::lock_guard<std::mutex> _cpy(m_lock);
-
+            #ifdef NOC_DEBUG
+            std::puts("Copy Assignment of Vector.");
+            #endif
             if ( this != &other ) {
                 m_data = other.m_data;
                 m_cap = other.m_cap;
@@ -135,7 +159,9 @@ namespace stl {
         vector& operator= ( vector&& other ) noexcept
         {
             std::lock_guard<std::mutex> _mov(m_lock);
-
+            #ifdef NOC_DEBUG
+            std::puts("Move Assignment of Vector.");
+            #endif
             if ( this != &other ) {
                 m_data = other.m_data;
                 m_cap = other.m_cap;
@@ -203,18 +229,47 @@ namespace stl {
         void emplace_back(_Params&&... _input)
         {
             std::lock_guard<std::mutex> _emp_back(m_lock);
+            #ifdef NOC_DEBUG
+            std::puts("START OF EMPLACE_BACK: Vector");
+            #endif
             if ( m_size == m_cap ) {
+                #ifdef NOC_DEBUG
+                std::puts("M_SIZE == M_CAP: Vector");
+                #endif
                 realloc_cap(
                     m_cap * 2
                 );
                 m_size += 1;
-                allocTraits::construct(
-                    m_attr,
-                    m_data + m_size,
-                    _input...
-                );
+                if constexpr (
+                    std::is_trivially_copyable_v<_Type>
+                ) {
+                    allocTraits::construct(
+                        m_attr,
+                        m_data + (m_size - 1),
+                        _input...
+                    );
+                } else if constexpr (
+                    std::is_trivially_move_constructible_v<_Type>
+                ) {
+                    allocTraits::construct(
+                        m_attr,
+                        m_data + (m_size - 1),
+                        std::move_if_noexcept(
+                            _input...
+                        )
+                    );
+                } else {
+                    allocTraits::construct(
+                        m_attr,
+                        m_data + (m_size - 1),
+                        std::forward<_Params>(_input)...
+                    );
+                }
             } else {
                 m_size += 1;
+                #ifdef NOC_DEBUG
+                std::puts("NO REALLOC: Vector");
+                #endif
                 if constexpr (
                     std::is_trivially_copyable_v<_Type> 
                 ) {
@@ -237,7 +292,7 @@ namespace stl {
                     allocTraits::construct(
                         m_attr,
                         m_data + (m_size - 1),
-                        _input...
+                        std::forward<_Params>(_input)...
                     );
                 }
             }
@@ -246,7 +301,9 @@ namespace stl {
         void resize ( const std::size_t _new_cap )
         {
             std::lock_guard<std::mutex> _resize(m_lock);
-
+            #ifdef NOC_DEBUG
+            std::puts("Resizing Vector.");
+            #endif
             if ( _new_cap == m_cap ) {
                 return;
             } else {
@@ -257,12 +314,17 @@ namespace stl {
         void reserve ( const std::size_t _requested_space )
         {
             std::lock_guard<std::mutex> _res(m_lock);
-
+            #ifdef NOC_DEBUG
+            std::puts("Reserving space for Vector.");
+            #endif
             realloc_cap(m_cap + _requested_space);
         }
 
-        void clear() noexcept {
+        void clear(void) noexcept {
             std::lock_guard<std::mutex> _clr(m_lock);
+            #ifdef NOC_DEBUG
+            std::puts("Clearing Vector.");
+            #endif
             if (
                 m_size != 0
             ) {
@@ -281,8 +343,8 @@ namespace stl {
         }
 
         void swap(
-            std::size_t elemIdx1,
-            std::size_t elemIdx2
+            const std::size_t elemIdx1,
+            const std::size_t elemIdx2
         ) {
             std::lock_guard<std::mutex> _swp(m_lock);
             _Type& elem1 = at(elemIdx1);
@@ -292,19 +354,30 @@ namespace stl {
             elem2 = __utl::copy(elem1);
         }
 
-        std::size_t size() {
+        void insert(
+            _Type _elem,
+            const std::size_t _req_idx
+        ) {
+            if (
+                _req_idx >= m_cap
+            ) { return; } else {
+                allocTraits::construct(m_attr, m_data + _req_idx, _elem);
+            }
+        }
+
+        std::size_t size(void) {
             return m_size;
         }
 
-        std::size_t capacity() {
+        std::size_t capacity(void) {
             return m_cap;
         }
 
-        const _Type* pbegin() {
+        const _Type* pbegin(void) {
             return m_data;
         }
 
-        const _Type* pend() {
+        const _Type* pend(void) {
             return m_data + (m_cap - 1);
         }
 
