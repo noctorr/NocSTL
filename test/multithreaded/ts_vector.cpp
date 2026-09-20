@@ -8,7 +8,7 @@
 #include <chrono>
 #include <csignal>
 
-static std::sig_atomic_t sig = 1;
+static volatile std::sig_atomic_t sig = 1;
 
 struct Data {
     const char* username;
