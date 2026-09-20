@@ -211,15 +211,35 @@ namespace stl {
                 allocTraits::construct(
                     m_attr,
                     m_data + m_size,
-                    _Type{_input...}
+                    _input...
                 );
             } else {
                 m_size += 1;
-                allocTraits::construct(
-                    m_attr,
-                    m_data + (m_size - 1),
-                    _Type{_input...}
-                );
+                if constexpr (
+                    std::is_trivially_copyable_v<_Type> 
+                ) {
+                    allocTraits::construct(
+                        m_attr,
+                        m_data + (m_size - 1),
+                        _input...
+                    );
+                } else if constexpr (
+                    std::is_trivially_move_constructible_v<_Type>
+                ) {
+                    allocTraits::construct(
+                        m_attr,
+                        m_data + (m_size - 1),
+                        std::move_if_noexcept(
+                            _input...
+                        )
+                    );
+                } else {
+                    allocTraits::construct(
+                        m_attr,
+                        m_data + (m_size - 1),
+                        _input...
+                    );
+                }
             }
         }
 
